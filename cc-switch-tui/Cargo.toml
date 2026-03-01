@@ -35,3 +35,18 @@ env_logger = "0.11"
 # Unix-specific for daemon mode
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+
+[package.metadata.deb]
+maintainer = "Jason Young"
+copyright = "2024, Jason Young <jason@example.com>"
+license-file = ["../LICENSE", "4"]
+extended-description = """\
+A terminal user interface for CC-Switch, an AI provider proxy with automatic failover.\
+Provides an interactive TUI for managing and monitoring the CC-Switch service."""
+depends = "libc6"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/cc-switch-tui", "usr/bin/", "755"],
+    ["../README.md", "usr/share/doc/cc-switch-tui/README", "644"],
+]
