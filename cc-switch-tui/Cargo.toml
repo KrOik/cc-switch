@@ -1,0 +1,37 @@
+[package]
+name = "cc-switch-tui"
+version = "3.11.1"
+description = "Terminal UI for CC-Switch"
+authors = ["Jason Young"]
+license = "MIT"
+repository = "https://github.com/farion1231/cc-switch"
+edition = "2021"
+rust-version = "1.85.0"
+
+[[bin]]
+name = "cc-switch-tui"
+path = "src/main.rs"
+
+[dependencies]
+cc-switch-core = { path = "../cc-switch-core" }
+
+# Workspace dependencies
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+log = { workspace = true }
+anyhow = { workspace = true }
+
+# TUI libraries
+ratatui = "0.28"
+crossterm = "0.28"
+
+# CLI argument parsing
+clap = { version = "4.5", features = ["derive"] }
+
+# Logging
+env_logger = "0.11"
+
+# Unix-specific for daemon mode
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

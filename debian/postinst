@@ -1,0 +1,41 @@
+#!/bin/bash
+set -e
+
+# Create systemd service
+cat > /etc/systemd/system/cc-switch-tui.service <<'EOF'
+[Unit]
+Description=CC-Switch TUI Proxy Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/cc-switch-tui proxy start
+Restart=on-failure
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Reload systemd
+systemctl daemon-reload
+
+# Create config directory
+mkdir -p /root/.cc-switch
+mkdir -p /var/log/cc-switch
+
+echo ""
+echo "CC-Switch TUI installed successfully!"
+echo ""
+echo "Usage:"
+echo "  Interactive TUI:     cc-switch-tui"
+echo "  Start proxy:         cc-switch-tui proxy start"
+echo "  Stop proxy:          cc-switch-tui proxy stop"
+echo "  Proxy status:        cc-switch-tui proxy status"
+echo ""
+echo "Systemd service:"
+echo "  Start service:       systemctl start cc-switch-tui"
+echo "  Enable on boot:      systemctl enable cc-switch-tui"
+echo "  Check status:        systemctl status cc-switch-tui"
+echo ""

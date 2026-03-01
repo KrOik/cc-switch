@@ -1,26 +1,60 @@
-node_modules/
-dist/
-release/
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# IDE
+/.idea/
+/.vscode/
+*.swp
+*.swo
+*~
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+*.o
+*.a
+*.rlib
+*.d
+
+# Debian packaging
+/debian/.debhelper/
+/debian/cc-switch-tui/
+/debian/files
+/debian/*.log
+/debian/*.substvars
+/debian/tmp/
+
+# Application data
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
 *.log
+
+# Environment
 .env
 .env.local
-*.tsbuildinfo
-.npmrc
-CLAUDE.md
-# AGENTS.md
-GEMINI.md
-/.claude
-/.codex
-/.gemini
-/.cc-switch
-/.idea
-/.vscode
-vitest-report.json
-nul
 
 # Flatpak build artifacts
 flatpak/cc-switch.deb
 flatpak-build/
 flatpak-repo/
+
+# Project specific
+/.claude/
+/.codex/
+/.gemini/
+/.cc-switch/
 .worktrees/
+CLAUDE.md
+GEMINI.md

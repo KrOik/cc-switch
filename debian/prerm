@@ -1,0 +1,19 @@
+#!/bin/bash
+set -e
+
+# Stop and disable service if running
+if systemctl is-active --quiet cc-switch-tui; then
+    systemctl stop cc-switch-tui
+fi
+
+if systemctl is-enabled --quiet cc-switch-tui; then
+    systemctl disable cc-switch-tui
+fi
+
+# Remove systemd service file
+if [ -f /etc/systemd/system/cc-switch-tui.service ]; then
+    rm -f /etc/systemd/system/cc-switch-tui.service
+    systemctl daemon-reload
+fi
+
+echo "CC-Switch TUI service stopped and disabled"
