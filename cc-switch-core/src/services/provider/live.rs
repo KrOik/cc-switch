@@ -105,7 +105,7 @@ impl LiveSnapshot {
 }
 
 /// Write live configuration snapshot for a provider
-pub(crate) fn write_live_snapshot(app_type: &AppType, provider: &Provider) -> Result<(), AppError> {
+pub fn write_live_snapshot(app_type: &AppType, provider: &Provider) -> Result<(), AppError> {
     match app_type {
         AppType::Claude => {
             let path = get_claude_settings_path();

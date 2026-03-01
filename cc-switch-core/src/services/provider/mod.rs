@@ -23,11 +23,11 @@ use crate::store::AppState;
 pub use live::{
     import_default_config, import_openclaw_providers_from_live,
     import_opencode_providers_from_live, read_live_settings, sync_current_to_live,
+    write_live_snapshot,
 };
 
 // Internal re-exports (pub(crate))
 pub(crate) use live::sanitize_claude_settings_for_live;
-pub(crate) use live::write_live_snapshot;
 
 // Internal re-exports
 use live::{

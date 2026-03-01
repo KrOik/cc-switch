@@ -1,13 +1,29 @@
 use super::App;
 use anyhow::Result;
+use std::str::FromStr;
 
 impl App {
     /// 切换 Provider
     pub async fn switch_provider(&mut self, provider_id: &str) -> Result<()> {
         log::info!("Switching to provider: {}", provider_id);
 
+        // 获取目标 provider
+        let provider = self.providers_cache.get(provider_id)
+            .ok_or_else(|| anyhow::anyhow!("Provider {} 不存在", provider_id))?
+            .clone();
+
+        // 解析 app_type
+        let app_type = cc_switch_core::app_config::AppType::from_str(&self.current_app_type)
+            .map_err(|e| anyhow::anyhow!("无效的应用类型: {}", e))?;
+
         // 更新数据库中的当前 provider
         self.db.set_current_provider(&self.current_app_type, provider_id)?;
+
+        // 写入 live 配置文件（关键步骤）
+        cc_switch_core::services::provider::write_live_snapshot(&app_type, &provider)
+            .map_err(|e| anyhow::anyhow!("写入 live 配置失败: {}", e))?;
+
+        log::info!("Provider switched to {} and live config updated", provider_id);
 
         // 刷新缓存
         self.refresh_providers()?;
@@ -103,6 +119,8 @@ impl App {
     pub async fn save_provider(&mut self, data: crate::ui::provider_form::ProviderFormData) -> Result<()> {
         use cc_switch_core::Provider;
 
+        let is_new = data.id.is_none();
+
         let mut provider = if let Some(id) = data.id {
             // 编辑现有 Provider
             log::info!("Updating provider: {}", id);
@@ -133,7 +151,34 @@ impl App {
         provider.website_url = data.website_url;
         provider.notes = data.notes;
 
+        // 保存到数据库
         self.db.save_provider(&self.current_app_type, &provider)?;
+
+        // 检查是否需要写入 live 配置
+        let current_provider_id = self.db.get_current_provider(&self.current_app_type)?;
+        let should_write_live = if is_new {
+            // 新增：如果没有当前 provider，设为当前并写入 live
+            if current_provider_id.is_none() {
+                self.db.set_current_provider(&self.current_app_type, &provider.id)?;
+                true
+            } else {
+                false
+            }
+        } else {
+            // 编辑：如果是当前 provider，写入 live
+            current_provider_id.as_deref() == Some(provider.id.as_str())
+        };
+
+        if should_write_live {
+            let app_type = cc_switch_core::app_config::AppType::from_str(&self.current_app_type)
+                .map_err(|e| anyhow::anyhow!("无效的应用类型: {}", e))?;
+
+            cc_switch_core::services::provider::write_live_snapshot(&app_type, &provider)
+                .map_err(|e| anyhow::anyhow!("写入 live 配置失败: {}", e))?;
+
+            log::info!("Live config updated for provider {}", provider.id);
+        }
+
         self.refresh_providers()?;
         self.close_provider_form();
         Ok(())
