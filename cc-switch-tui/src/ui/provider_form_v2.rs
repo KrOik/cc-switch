@@ -8,7 +8,7 @@ use ratatui::{
 };
 use serde_json::Value;
 
-use super::forms::{FormContainer, Select, TextArea, TextInput};
+use super::forms::{Button, FormContainer, Select, TextArea, TextInput};
 use super::provider_config::{ParsedProviderConfig, ProviderType};
 
 /// Provider 表单模式
@@ -89,6 +89,10 @@ impl ProviderFormViewV2 {
 
         // 备注（可选）
         form = form.add_text_area(TextArea::new("备注"));
+
+        // 添加按钮
+        form = form.add_button(Button::new("保存").primary());
+        form = form.add_button(Button::new("取消"));
 
         form.activate();
 
@@ -180,6 +184,10 @@ impl ProviderFormViewV2 {
         // 备注（可选）
         form = form.add_text_area(TextArea::new("备注").with_value(notes.unwrap_or_default()));
 
+        // 添加按钮
+        form = form.add_button(Button::new("保存").primary());
+        form = form.add_button(Button::new("取消"));
+
         form.activate();
 
         Self {
@@ -194,12 +202,20 @@ impl ProviderFormViewV2 {
     pub fn handle_key(&mut self, key: KeyCode, modifiers: KeyModifiers) -> FormAction {
         match key {
             KeyCode::Esc => FormAction::Cancel,
-            KeyCode::Enter if modifiers.contains(KeyModifiers::CONTROL) => {
-                // Ctrl+Enter 提交表单
-                self.submit()
-            }
             _ => {
                 self.form.handle_key(key, modifiers);
+
+                // 检查是否点击了按钮
+                if key == KeyCode::Enter || key == KeyCode::Char(' ') {
+                    if let Some(button_label) = self.form.get_focused_button_label() {
+                        match button_label.as_str() {
+                            "保存" => return self.submit(),
+                            "取消" => return FormAction::Cancel,
+                            _ => {}
+                        }
+                    }
+                }
+
                 FormAction::None
             }
         }

@@ -7,7 +7,7 @@ use ratatui::{
     Frame,
 };
 
-use super::{Checkbox, Select, TextArea, TextInput};
+use super::{Button, Checkbox, Select, TextArea, TextInput};
 
 /// 表单字段类型
 #[derive(Clone)]
@@ -16,6 +16,7 @@ pub enum FormField {
     TextArea(TextArea),
     Checkbox(Checkbox),
     Select(Select),
+    Button(Button),
 }
 
 /// 表单值类型
@@ -98,6 +99,12 @@ impl FormContainer {
         self
     }
 
+    /// 添加按钮字段
+    pub fn add_button(mut self, button: Button) -> Self {
+        self.fields.push(FormField::Button(button));
+        self
+    }
+
     /// 激活表单
     pub fn activate(&mut self) {
         self.is_active = true;
@@ -120,6 +127,7 @@ impl FormContainer {
                 FormField::TextArea(area) => area.set_focused(focused),
                 FormField::Checkbox(checkbox) => checkbox.set_focused(focused),
                 FormField::Select(select) => select.set_focused(focused),
+                FormField::Button(button) => button.set_focused(focused),
             }
         }
     }
@@ -132,6 +140,7 @@ impl FormContainer {
                 FormField::TextArea(area) => area.set_focused(false),
                 FormField::Checkbox(checkbox) => checkbox.set_focused(false),
                 FormField::Select(select) => select.set_focused(false),
+                FormField::Button(button) => button.set_focused(false),
             }
         }
     }
@@ -186,10 +195,21 @@ impl FormContainer {
                     }
                 }
                 FormField::Select(select) => select.handle_key(key),
+                FormField::Button(button) => button.handle_key(key),
             }
         } else {
             false
         }
+    }
+
+    /// 检查当前聚焦的是否是按钮，以及是哪个按钮
+    pub fn get_focused_button_label(&self) -> Option<String> {
+        if let Some(field) = self.fields.get(self.focused_index) {
+            if let FormField::Button(button) = field {
+                return Some(button.label.clone());
+            }
+        }
+        None
     }
 
     /// 验证所有字段
@@ -214,6 +234,7 @@ impl FormContainer {
                 }
                 FormField::Checkbox(_) => Ok(()),
                 FormField::Select(select) => select.validate(),
+                FormField::Button(_) => Ok(()), // 按钮不需要验证
             };
 
             if let Err(e) = result {
@@ -232,11 +253,12 @@ impl FormContainer {
     pub fn get_values(&self) -> Vec<FormValue> {
         self.fields
             .iter()
-            .map(|field| match field {
-                FormField::TextInput(input) => FormValue::Text(input.get_value().to_string()),
-                FormField::TextArea(area) => FormValue::Text(area.get_value()),
-                FormField::Checkbox(checkbox) => FormValue::Bool(checkbox.is_checked()),
-                FormField::Select(select) => FormValue::Index(select.get_selected_index()),
+            .filter_map(|field| match field {
+                FormField::TextInput(input) => Some(FormValue::Text(input.get_value().to_string())),
+                FormField::TextArea(area) => Some(FormValue::Text(area.get_value())),
+                FormField::Checkbox(checkbox) => Some(FormValue::Bool(checkbox.is_checked())),
+                FormField::Select(select) => Some(FormValue::Index(select.get_selected_index())),
+                FormField::Button(_) => None, // 按钮不返回值
             })
             .collect()
     }
@@ -254,6 +276,7 @@ impl FormContainer {
                 FormField::TextInput(_) => 3,
                 FormField::TextArea(_) => 8,
                 FormField::Checkbox(_) => 1,
+                FormField::Button(_) => 3,
                 FormField::Select(select) => {
                     if select.is_expanded {
                         (select.options.len() + 2).min(10) as u16
@@ -282,6 +305,7 @@ impl FormContainer {
                     FormField::TextArea(area) => area.render(f, chunks[i]),
                     FormField::Checkbox(checkbox) => checkbox.render(f, chunks[i]),
                     FormField::Select(select) => select.render(f, chunks[i]),
+                    FormField::Button(button) => button.render(f, chunks[i]),
                 }
             }
         }
