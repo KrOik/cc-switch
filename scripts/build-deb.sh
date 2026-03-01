@@ -56,7 +56,7 @@ chmod +x debian-pkg/DEBIAN/prerm
 
 # Build .deb package
 echo "Building .deb package..."
-dpkg-deb --build debian-pkg cc-switch-tui_3.11.1_arm64.deb
+dpkg-deb --build --root-owner-group -Zgzip debian-pkg cc-switch-tui_3.11.1_arm64.deb
 
 # Get package info
 echo ""
