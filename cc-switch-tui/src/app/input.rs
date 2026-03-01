@@ -4,7 +4,7 @@ use crossterm::event::KeyCode;
 
 impl App {
     /// 处理键盘输入（扩展版本，支持更多操作）
-    pub fn handle_key_extended(&mut self, key: KeyCode) -> Result<Option<AppAction>> {
+    pub fn handle_key_extended(&mut self, key: KeyCode, modifiers: crossterm::event::KeyModifiers) -> Result<Option<AppAction>> {
         match self.mode {
             AppMode::Dashboard => self.handle_dashboard_key(key),
             AppMode::Providers => self.handle_providers_key(key),
@@ -12,6 +12,7 @@ impl App {
             AppMode::Mcp => self.handle_mcp_key(key),
             AppMode::Universal => self.handle_universal_key(key),
             AppMode::Config => self.handle_config_key(key),
+            AppMode::ProviderForm => self.handle_provider_form_key(key, modifiers),
         }
     }
 
@@ -75,6 +76,19 @@ impl App {
                     let id = provider.id.clone();
                     let name = provider.name.clone();
                     self.show_delete_provider_confirm(id, &name);
+                    Ok(None)
+                } else {
+                    Ok(None)
+                }
+            }
+            KeyCode::Char('a') | KeyCode::Char('A') => {
+                self.show_add_provider_form();
+                Ok(None)
+            }
+            KeyCode::Char('e') | KeyCode::Char('E') => {
+                if let Some(provider) = self.get_selected_provider() {
+                    let id = provider.id.clone();
+                    self.show_edit_provider_form(&id);
                     Ok(None)
                 } else {
                     Ok(None)
@@ -195,6 +209,25 @@ impl App {
             _ => Ok(None),
         }
     }
+
+    fn handle_provider_form_key(&mut self, key: KeyCode, modifiers: crossterm::event::KeyModifiers) -> Result<Option<AppAction>> {
+        if let Some(form) = &mut self.provider_form {
+            use crate::ui::provider_form::FormAction;
+
+            match form.handle_key(key, modifiers) {
+                FormAction::Submit(data) => {
+                    Ok(Some(AppAction::SaveProvider(data)))
+                }
+                FormAction::Cancel => {
+                    self.close_provider_form();
+                    Ok(None)
+                }
+                FormAction::None => Ok(None),
+            }
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 /// 应用操作枚举（需要异步执行的操作）
@@ -202,6 +235,7 @@ impl App {
 pub enum AppAction {
     SwitchProvider(String),
     DeleteProvider(String),
+    SaveProvider(crate::ui::provider_form::ProviderFormData),
     StartProxy,
     StopProxy,
     RestartProxy,

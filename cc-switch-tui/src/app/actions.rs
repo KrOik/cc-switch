@@ -68,11 +68,77 @@ impl App {
         Ok(())
     }
 
+    /// 显示添加 Provider 表单
+    pub fn show_add_provider_form(&mut self) {
+        self.provider_form = Some(crate::ui::provider_form::ProviderFormView::new_add());
+        self.mode = super::AppMode::ProviderForm;
+    }
+
+    /// 显示编辑 Provider 表单
+    pub fn show_edit_provider_form(&mut self, provider_id: &str) {
+        if let Some(provider) = self.providers_cache.get(provider_id) {
+            self.provider_form = Some(crate::ui::provider_form::ProviderFormView::new_edit(
+                provider.id.clone(),
+                provider.name.clone(),
+                &provider.settings_config,
+                provider.website_url.clone(),
+                provider.notes.clone(),
+            ));
+            self.mode = super::AppMode::ProviderForm;
+        }
+    }
+
+    /// 关闭 Provider 表单
+    pub fn close_provider_form(&mut self) {
+        self.provider_form = None;
+        self.mode = super::AppMode::Providers;
+    }
+
+    /// 保存 Provider（新增或编辑）
+    pub async fn save_provider(&mut self, data: crate::ui::provider_form::ProviderFormData) -> Result<()> {
+        use cc_switch_core::Provider;
+
+        let mut provider = if let Some(id) = data.id {
+            // 编辑现有 Provider
+            log::info!("Updating provider: {}", id);
+
+            self.providers_cache.get(&id)
+                .ok_or_else(|| anyhow::anyhow!("Provider not found"))?
+                .clone()
+        } else {
+            // 新增 Provider - 使用时间戳生成简单 ID
+            log::info!("Adding new provider: {}", data.name);
+
+            let id = format!("provider_{}", std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis());
+
+            Provider::with_id(
+                id,
+                data.name.clone(),
+                data.settings_config.clone(),
+                data.website_url.clone(),
+            )
+        };
+
+        // 更新字段
+        provider.name = data.name;
+        provider.settings_config = data.settings_config;
+        provider.website_url = data.website_url;
+        provider.notes = data.notes;
+
+        self.db.save_provider(&self.current_app_type, &provider)?;
+        self.refresh_providers()?;
+        self.close_provider_form();
+        Ok(())
+    }
+
     /// 删除 Provider
     pub async fn delete_provider(&mut self, provider_id: &str) -> Result<()> {
         log::info!("Deleting provider: {}", provider_id);
 
-        // TODO: 实现实际的删除逻辑
+        self.db.delete_provider(provider_id, &self.current_app_type)?;
         self.refresh_providers()?;
         Ok(())
     }

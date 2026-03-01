@@ -22,7 +22,7 @@ pub fn run_tui() -> Result<()> {
         terminal.draw(|f| render_ui(f, &app))?;
 
         if event::poll(std::time::Duration::from_millis(100))? {
-            if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+            if let Event::Key(KeyEvent { code, modifiers, .. }) = event::read()? {
                 // 如果有对话框，优先处理对话框输入
                 if app.has_dialog() {
                     if let Ok(handled) = app.handle_dialog_key(code) {
@@ -34,7 +34,7 @@ pub fn run_tui() -> Result<()> {
                     }
                 } else {
                     // 正常的键盘处理
-                    app.handle_key(code)?;
+                    app.handle_key_extended(code, modifiers)?;
                 }
             }
         }
@@ -59,6 +59,11 @@ fn render_ui(f: &mut Frame, app: &App) {
         AppMode::Mcp => ui::mcp::render(f, app),
         AppMode::Universal => ui::universal::render(f, app),
         AppMode::Config => ui::config::render(f, app),
+        AppMode::ProviderForm => {
+            if let Some(form) = &app.provider_form {
+                form.render(f, f.area());
+            }
+        }
     }
 
     // 如果有对话框，渲染在最上层

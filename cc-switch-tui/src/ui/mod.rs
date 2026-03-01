@@ -7,3 +7,5 @@ pub mod universal;
 pub mod config;
 pub mod common;
 pub mod dialog;
+pub mod forms;
+pub mod provider_form;
