@@ -584,7 +584,6 @@ mod tests {
             start_time: Arc::new(RwLock::new(None)),
             current_providers: Arc::new(RwLock::new(HashMap::new())),
             provider_router: Arc::new(ProviderRouter::new(db.clone())),
-            app_handle: None,
             failover_manager: Arc::new(FailoverSwitchManager::new(db)),
         }
     }
