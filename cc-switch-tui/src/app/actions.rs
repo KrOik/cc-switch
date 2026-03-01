@@ -207,7 +207,33 @@ impl App {
 
     /// 删除 MCP 服务器
     pub async fn delete_mcp_server(&mut self, server_id: &str) -> Result<()> {
+        use cc_switch_core::app_config::AppType;
+        use cc_switch_core::mcp;
+
         log::info!("Deleting MCP server: {}", server_id);
+
+        // 从所有启用的应用中移除
+        if let Some(server) = self.mcp_servers_cache.get(server_id) {
+            for app in server.apps.enabled_apps() {
+                match app {
+                    AppType::Claude => {
+                        mcp::remove_server_from_claude(server_id)?;
+                    }
+                    AppType::Codex => {
+                        mcp::remove_server_from_codex(server_id)?;
+                    }
+                    AppType::Gemini => {
+                        mcp::remove_server_from_gemini(server_id)?;
+                    }
+                    AppType::OpenCode => {
+                        mcp::remove_server_from_opencode(server_id)?;
+                    }
+                    AppType::OpenClaw => {
+                        log::debug!("OpenClaw MCP support is still in development, skipping remove");
+                    }
+                }
+            }
+        }
 
         self.db.delete_mcp_server(server_id)?;
         self.refresh_mcp_servers()?;
@@ -244,7 +270,17 @@ impl App {
 
     /// 保存 MCP 服务器（新增或编辑）
     pub async fn save_mcp_server(&mut self, data: crate::ui::mcp_form::McpFormData) -> Result<()> {
-        use cc_switch_core::app_config::{McpServer, McpApps};
+        use cc_switch_core::app_config::{McpServer, McpApps, AppType};
+        use cc_switch_core::mcp;
+
+        // 读取旧状态（用于处理禁用）
+        let prev_apps = if let Some(ref id) = data.id {
+            self.mcp_servers_cache.get(id)
+                .map(|s| s.apps.clone())
+                .unwrap_or_default()
+        } else {
+            McpApps::default()
+        };
 
         let mut server = if let Some(id) = data.id {
             // 编辑现有 MCP 服务器
@@ -286,6 +322,42 @@ impl App {
         server.apps.opencode = data.opencode_enabled;
 
         self.db.save_mcp_server(&server)?;
+
+        // 处理禁用：从 live 配置移除
+        if prev_apps.claude && !server.apps.claude {
+            mcp::remove_server_from_claude(&server.id)?;
+        }
+        if prev_apps.codex && !server.apps.codex {
+            mcp::remove_server_from_codex(&server.id)?;
+        }
+        if prev_apps.gemini && !server.apps.gemini {
+            mcp::remove_server_from_gemini(&server.id)?;
+        }
+        if prev_apps.opencode && !server.apps.opencode {
+            mcp::remove_server_from_opencode(&server.id)?;
+        }
+
+        // 同步到启用的应用
+        for app in server.apps.enabled_apps() {
+            match app {
+                AppType::Claude => {
+                    mcp::sync_single_server_to_claude(&Default::default(), &server.id, &server.server)?;
+                }
+                AppType::Codex => {
+                    mcp::sync_single_server_to_codex(&Default::default(), &server.id, &server.server)?;
+                }
+                AppType::Gemini => {
+                    mcp::sync_single_server_to_gemini(&Default::default(), &server.id, &server.server)?;
+                }
+                AppType::OpenCode => {
+                    mcp::sync_single_server_to_opencode(&Default::default(), &server.id, &server.server)?;
+                }
+                AppType::OpenClaw => {
+                    log::debug!("OpenClaw MCP support is still in development, skipping sync");
+                }
+            }
+        }
+
         self.refresh_mcp_servers()?;
         self.close_mcp_form();
         Ok(())
@@ -293,20 +365,60 @@ impl App {
 
     /// 切换 MCP 服务器的应用启用状态
     pub async fn toggle_mcp_app(&mut self, server_id: &str, app: &str, enabled: bool) -> Result<()> {
+        use cc_switch_core::app_config::AppType;
+        use cc_switch_core::mcp;
+
         log::info!("Toggling MCP {} for {}: {}", server_id, app, enabled);
 
         // 获取服务器并更新应用启用状态
         if let Some(mut server) = self.mcp_servers_cache.get(server_id).cloned() {
-            match app {
-                "claude" => server.apps.claude = enabled,
-                "codex" => server.apps.codex = enabled,
-                "gemini" => server.apps.gemini = enabled,
-                "opencode" => server.apps.opencode = enabled,
-                _ => return Err(anyhow::anyhow!("Unknown app type: {}", app)),
-            }
+            let app_type = AppType::from_str(app)
+                .map_err(|e| anyhow::anyhow!("无效的应用类型: {}", e))?;
+
+            server.apps.set_enabled_for(&app_type, enabled);
 
             // 保存到数据库
             self.db.save_mcp_server(&server)?;
+
+            // 同步到 live 配置
+            if enabled {
+                match app_type {
+                    AppType::Claude => {
+                        mcp::sync_single_server_to_claude(&Default::default(), &server.id, &server.server)?;
+                    }
+                    AppType::Codex => {
+                        mcp::sync_single_server_to_codex(&Default::default(), &server.id, &server.server)?;
+                    }
+                    AppType::Gemini => {
+                        mcp::sync_single_server_to_gemini(&Default::default(), &server.id, &server.server)?;
+                    }
+                    AppType::OpenCode => {
+                        mcp::sync_single_server_to_opencode(&Default::default(), &server.id, &server.server)?;
+                    }
+                    AppType::OpenClaw => {
+                        log::debug!("OpenClaw MCP support is still in development, skipping sync");
+                    }
+                }
+            } else {
+                match app_type {
+                    AppType::Claude => {
+                        mcp::remove_server_from_claude(&server.id)?;
+                    }
+                    AppType::Codex => {
+                        mcp::remove_server_from_codex(&server.id)?;
+                    }
+                    AppType::Gemini => {
+                        mcp::remove_server_from_gemini(&server.id)?;
+                    }
+                    AppType::OpenCode => {
+                        mcp::remove_server_from_opencode(&server.id)?;
+                    }
+                    AppType::OpenClaw => {
+                        log::debug!("OpenClaw MCP support is still in development, skipping remove");
+                    }
+                }
+            }
+
             self.refresh_mcp_servers()?;
         }
 
