@@ -5,9 +5,11 @@ use crossterm::{
     ExecutableCommand,
 };
 use ratatui::{backend::CrosstermBackend, Terminal, Frame};
+use tokio::runtime::Runtime;
 
 use super::{App, AppMode};
 use crate::ui;
+use super::input::AppAction;
 
 pub fn run_tui() -> Result<()> {
     enable_raw_mode()?;
@@ -17,6 +19,7 @@ pub fn run_tui() -> Result<()> {
     let mut terminal = Terminal::new(backend)?;
 
     let mut app = App::new()?;
+    let rt = Runtime::new()?;
 
     loop {
         terminal.draw(|f| render_ui(f, &app))?;
@@ -27,14 +30,21 @@ pub fn run_tui() -> Result<()> {
                 if app.has_dialog() {
                     if let Ok(handled) = app.handle_dialog_key(code) {
                         if !handled {
-                            // 用户确认了操作，需要执行待处理的操作
-                            // 这里暂时只是关闭对话框，实际操作需要异步处理
-                            // TODO: 集成异步操作执行
+                            // 用户确认了操作，执行待处理的操作
+                            if let Some(action) = app.take_pending_action() {
+                                if let Err(e) = execute_pending_action(&rt, &mut app, action) {
+                                    log::error!("Failed to execute action: {}", e);
+                                }
+                            }
                         }
                     }
                 } else {
                     // 正常的键盘处理
-                    app.handle_key_extended(code, modifiers)?;
+                    if let Ok(Some(action)) = app.handle_key_extended(code, modifiers) {
+                        if let Err(e) = execute_action(&rt, &mut app, action) {
+                            log::error!("Failed to execute action: {}", e);
+                        }
+                    }
                 }
             }
         }
@@ -70,4 +80,53 @@ fn render_ui(f: &mut Frame, app: &App) {
     if let Some(dialog) = app.get_dialog() {
         ui::dialog::render_confirm_dialog(f, dialog);
     }
+}
+
+/// 执行应用操作
+fn execute_action(rt: &Runtime, app: &mut App, action: AppAction) -> Result<()> {
+    match action {
+        AppAction::SwitchProvider(id) => {
+            rt.block_on(app.switch_provider(&id))?;
+        }
+        AppAction::SaveProvider(data) => {
+            rt.block_on(app.save_provider(data))?;
+        }
+        AppAction::StartProxy => {
+            rt.block_on(app.start_proxy())?;
+        }
+        AppAction::StopProxy => {
+            rt.block_on(app.stop_proxy())?;
+        }
+        AppAction::RefreshProxyStatus => {
+            rt.block_on(app.refresh_proxy_status_async())?;
+        }
+        AppAction::DeleteProvider(id) => {
+            rt.block_on(app.delete_provider(&id))?;
+        }
+        AppAction::DeleteMcpServer(id) => {
+            rt.block_on(app.delete_mcp_server(&id))?;
+        }
+        AppAction::SyncUniversalProvider(id) => {
+            rt.block_on(app.sync_universal_provider(&id))?;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+/// 执行待处理的操作（从对话框确认后）
+fn execute_pending_action(rt: &Runtime, app: &mut App, action: super::PendingAction) -> Result<()> {
+    match action {
+        super::PendingAction::DeleteProvider(id) => {
+            rt.block_on(app.delete_provider(&id))?;
+        }
+        super::PendingAction::DeleteMcpServer(id) => {
+            rt.block_on(app.delete_mcp_server(&id))?;
+        }
+        super::PendingAction::StopProxy => {
+            rt.block_on(app.stop_proxy())?;
+        }
+        _ => {}
+    }
+    Ok(())
 }
