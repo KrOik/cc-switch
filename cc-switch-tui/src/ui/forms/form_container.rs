@@ -47,6 +47,13 @@ impl FormValue {
             _ => None,
         }
     }
+
+    pub fn as_select_index(&self) -> Option<usize> {
+        match self {
+            FormValue::Index(i) => Some(*i),
+            _ => None,
+        }
+    }
 }
 
 /// 表单容器

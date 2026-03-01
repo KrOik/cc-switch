@@ -249,7 +249,21 @@ impl App {
     }
 
     fn handle_provider_form_key(&mut self, key: KeyCode, modifiers: crossterm::event::KeyModifiers) -> Result<Option<AppAction>> {
-        if let Some(form) = &mut self.provider_form {
+        // 优先处理 V2 表单
+        if let Some(form) = &mut self.provider_form_v2 {
+            use crate::ui::provider_form_v2::FormAction;
+
+            match form.handle_key(key, modifiers) {
+                FormAction::Submit(data) => {
+                    Ok(Some(AppAction::SaveProviderV2(data)))
+                }
+                FormAction::Cancel => {
+                    self.close_provider_form();
+                    Ok(None)
+                }
+                FormAction::None => Ok(None),
+            }
+        } else if let Some(form) = &mut self.provider_form {
             use crate::ui::provider_form::FormAction;
 
             match form.handle_key(key, modifiers) {
@@ -312,6 +326,7 @@ pub enum AppAction {
     SwitchProvider(String),
     DeleteProvider(String),
     SaveProvider(crate::ui::provider_form::ProviderFormData),
+    SaveProviderV2(crate::ui::provider_form_v2::ProviderFormData),
     SaveMcpServer(crate::ui::mcp_form::McpFormData),
     SaveUniversalProvider(crate::ui::universal_form::UniversalFormData),
     StartProxy,

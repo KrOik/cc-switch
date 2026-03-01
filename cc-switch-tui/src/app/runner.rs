@@ -70,7 +70,10 @@ fn render_ui(f: &mut Frame, app: &App) {
         AppMode::Universal => ui::universal::render(f, app),
         AppMode::Config => ui::config::render(f, app),
         AppMode::ProviderForm => {
-            if let Some(form) = &app.provider_form {
+            // 优先渲染 V2 表单
+            if let Some(form) = &app.provider_form_v2 {
+                form.render(f, f.area());
+            } else if let Some(form) = &app.provider_form {
                 form.render(f, f.area());
             }
         }
@@ -100,6 +103,9 @@ fn execute_action(rt: &Runtime, app: &mut App, action: AppAction) -> Result<()> 
         }
         AppAction::SaveProvider(data) => {
             rt.block_on(app.save_provider(data))?;
+        }
+        AppAction::SaveProviderV2(data) => {
+            rt.block_on(app.save_provider_v2(data))?;
         }
         AppAction::SaveMcpServer(data) => {
             rt.block_on(app.save_mcp_server(data))?;

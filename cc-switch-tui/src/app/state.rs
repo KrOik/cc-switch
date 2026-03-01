@@ -46,6 +46,7 @@ pub struct App {
     pub(crate) confirm_dialog: Option<ConfirmDialog>,
     pub(crate) pending_action: Option<PendingAction>,
     pub(crate) provider_form: Option<crate::ui::provider_form::ProviderFormView>,
+    pub(crate) provider_form_v2: Option<crate::ui::provider_form_v2::ProviderFormViewV2>,
     pub(crate) mcp_form: Option<crate::ui::mcp_form::McpFormView>,
     pub(crate) universal_form: Option<crate::ui::universal_form::UniversalFormView>,
 }
@@ -141,6 +142,7 @@ impl App {
             confirm_dialog: None,
             pending_action: None,
             provider_form: None,
+            provider_form_v2: None,
             mcp_form: None,
             universal_form: None,
         })

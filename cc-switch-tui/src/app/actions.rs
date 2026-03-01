@@ -94,17 +94,20 @@ impl App {
 
     /// 显示添加 Provider 表单
     pub fn show_add_provider_form(&mut self) {
-        self.provider_form = Some(crate::ui::provider_form::ProviderFormView::new_add());
+        // 使用改进的 V2 表单
+        self.provider_form_v2 = Some(crate::ui::provider_form_v2::ProviderFormViewV2::new_add());
         self.mode = super::AppMode::ProviderForm;
     }
 
     /// 显示编辑 Provider 表单
     pub fn show_edit_provider_form(&mut self, provider_id: &str) {
         if let Some(provider) = self.providers_cache.get(provider_id) {
-            self.provider_form = Some(crate::ui::provider_form::ProviderFormView::new_edit(
+            // 使用改进的 V2 表单
+            self.provider_form_v2 = Some(crate::ui::provider_form_v2::ProviderFormViewV2::new_edit(
                 provider.id.clone(),
                 provider.name.clone(),
                 &provider.settings_config,
+                provider.meta.as_ref().map(|m| serde_json::to_value(m).ok()).flatten().as_ref(),
                 provider.website_url.clone(),
                 provider.notes.clone(),
             ));
@@ -115,6 +118,7 @@ impl App {
     /// 关闭 Provider 表单
     pub fn close_provider_form(&mut self) {
         self.provider_form = None;
+        self.provider_form_v2 = None;
         self.mode = super::AppMode::Providers;
     }
 
@@ -153,6 +157,91 @@ impl App {
         provider.settings_config = data.settings_config;
         provider.website_url = data.website_url;
         provider.notes = data.notes;
+
+        // 保存到数据库
+        self.db.save_provider(&self.current_app_type, &provider)?;
+
+        // 检查是否需要写入 live 配置
+        let current_provider_id = self.db.get_current_provider(&self.current_app_type)?;
+        let should_write_live = if is_new {
+            // 新增：如果没有当前 provider，设为当前并写入 live
+            if current_provider_id.is_none() {
+                self.db.set_current_provider(&self.current_app_type, &provider.id)?;
+                true
+            } else {
+                false
+            }
+        } else {
+            // 编辑：如果是当前 provider，写入 live
+            current_provider_id.as_deref() == Some(provider.id.as_str())
+        };
+
+        if should_write_live {
+            let app_type = cc_switch_core::app_config::AppType::from_str(&self.current_app_type)
+                .map_err(|e| anyhow::anyhow!("无效的应用类型: {}", e))?;
+
+            cc_switch_core::services::provider::write_live_snapshot(&app_type, &provider)
+                .map_err(|e| anyhow::anyhow!("写入 live 配置失败: {}", e))?;
+
+            log::info!("Live config updated for provider {}", provider.id);
+
+            // 同步 MCP 配置
+            self.sync_mcp_for_current_app(&app_type)?;
+        }
+
+        self.refresh_providers()?;
+        self.close_provider_form();
+        Ok(())
+    }
+
+    /// 保存 Provider V2（支持 meta 字段）
+    pub async fn save_provider_v2(&mut self, data: crate::ui::provider_form_v2::ProviderFormData) -> Result<()> {
+        use cc_switch_core::Provider;
+
+        let is_new = data.id.is_none();
+
+        let mut provider = if let Some(id) = &data.id {
+            // 编辑现有 Provider
+            log::info!("Updating provider: {}", id);
+
+            self.providers_cache.get(id)
+                .ok_or_else(|| anyhow::anyhow!("Provider not found"))?
+                .clone()
+        } else {
+            // 新增 Provider - 使用时间戳生成简单 ID
+            log::info!("Adding new provider: {}", data.name);
+
+            let id = format!("provider_{}", std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis());
+
+            Provider::with_id(
+                id,
+                data.name.clone(),
+                data.settings_config.clone(),
+                data.website_url.clone(),
+            )
+        };
+
+        // 更新字段
+        provider.name = data.name;
+        provider.settings_config = data.settings_config;
+        provider.website_url = data.website_url;
+        provider.notes = data.notes;
+
+        // 更新 meta 字段
+        if let Some(meta_value) = data.meta {
+            // 解析 meta 为 ProviderMeta 结构
+            let mut meta = provider.meta.unwrap_or_default();
+
+            // 更新 api_format
+            if let Some(api_format) = meta_value.get("apiFormat").and_then(|v| v.as_str()) {
+                meta.api_format = Some(api_format.to_string());
+            }
+
+            provider.meta = Some(meta);
+        }
 
         // 保存到数据库
         self.db.save_provider(&self.current_app_type, &provider)?;
