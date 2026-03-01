@@ -26,10 +26,29 @@ chmod +x debian-pkg/usr/bin/cc-switch-tui
 
 # Copy control files
 echo "Copying control files..."
-# Extract only the binary package section and replace template variables
-sed -n '/^Package:/,$p' debian/control | \
-  sed 's/${shlibs:Depends}/libc6, libgcc-s1, libssl3/' | \
-  sed 's/, ${misc:Depends}//' > debian-pkg/DEBIAN/control
+# Create a proper binary package control file
+cat > debian-pkg/DEBIAN/control << 'EOF'
+Package: cc-switch-tui
+Version: 3.11.1
+Architecture: arm64
+Maintainer: Jason Young <jason@example.com>
+Depends: libc6, libgcc-s1, libssl3
+Section: net
+Priority: optional
+Homepage: https://github.com/farion1231/cc-switch
+Description: All-in-One Assistant for Claude Code, Codex & Gemini CLI
+ Terminal UI version for managing AI provider proxies with automatic
+ failover, circuit breaker, and MCP server integration.
+ .
+ Features:
+  - HTTP proxy server for Claude Code, Codex, and Gemini CLI
+  - Automatic failover between multiple providers
+  - Circuit breaker for fault tolerance
+  - MCP (Model Context Protocol) server management
+  - Provider configuration and switching
+  - Usage statistics and monitoring
+  - Terminal-based user interface with keyboard navigation
+EOF
 cp debian/postinst debian-pkg/DEBIAN/
 cp debian/prerm debian-pkg/DEBIAN/
 chmod +x debian-pkg/DEBIAN/postinst
