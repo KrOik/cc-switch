@@ -13,6 +13,7 @@ pub enum AppMode {
     Universal,
     Config,
     ProviderForm,
+    McpForm,
 }
 
 pub struct App {
@@ -44,6 +45,7 @@ pub struct App {
     pub(crate) confirm_dialog: Option<ConfirmDialog>,
     pub(crate) pending_action: Option<PendingAction>,
     pub(crate) provider_form: Option<crate::ui::provider_form::ProviderFormView>,
+    pub(crate) mcp_form: Option<crate::ui::mcp_form::McpFormView>,
 }
 
 // 临时结构体，用于存储数据（避免依赖完整的类型定义）
@@ -137,6 +139,7 @@ impl App {
             confirm_dialog: None,
             pending_action: None,
             provider_form: None,
+            mcp_form: None,
         })
     }
 

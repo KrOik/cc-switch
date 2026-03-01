@@ -74,6 +74,11 @@ fn render_ui(f: &mut Frame, app: &App) {
                 form.render(f, f.area());
             }
         }
+        AppMode::McpForm => {
+            if let Some(form) = &app.mcp_form {
+                form.render(f, f.area());
+            }
+        }
     }
 
     // 如果有对话框，渲染在最上层
@@ -90,6 +95,9 @@ fn execute_action(rt: &Runtime, app: &mut App, action: AppAction) -> Result<()> 
         }
         AppAction::SaveProvider(data) => {
             rt.block_on(app.save_provider(data))?;
+        }
+        AppAction::SaveMcpServer(data) => {
+            rt.block_on(app.save_mcp_server(data))?;
         }
         AppAction::StartProxy => {
             rt.block_on(app.start_proxy())?;

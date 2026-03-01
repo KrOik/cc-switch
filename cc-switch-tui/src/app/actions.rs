@@ -152,6 +152,83 @@ impl App {
         Ok(())
     }
 
+    /// 显示添加 MCP 表单
+    pub fn show_add_mcp_form(&mut self) {
+        self.mcp_form = Some(crate::ui::mcp_form::McpFormView::new_add());
+        self.mode = super::AppMode::McpForm;
+    }
+
+    /// 显示编辑 MCP 表单
+    pub fn show_edit_mcp_form(&mut self, server_id: &str) {
+        if let Some(server) = self.mcp_servers_cache.get(server_id) {
+            self.mcp_form = Some(crate::ui::mcp_form::McpFormView::new_edit(
+                server.id.clone(),
+                server.name.clone(),
+                &server.server,
+                server.description.clone(),
+                server.homepage.clone(),
+                server.docs.clone(),
+                &server.apps,
+            ));
+            self.mode = super::AppMode::McpForm;
+        }
+    }
+
+    /// 关闭 MCP 表单
+    pub fn close_mcp_form(&mut self) {
+        self.mcp_form = None;
+        self.mode = super::AppMode::Mcp;
+    }
+
+    /// 保存 MCP 服务器（新增或编辑）
+    pub async fn save_mcp_server(&mut self, data: crate::ui::mcp_form::McpFormData) -> Result<()> {
+        use cc_switch_core::app_config::{McpServer, McpApps};
+
+        let mut server = if let Some(id) = data.id {
+            // 编辑现有 MCP 服务器
+            log::info!("Updating MCP server: {}", id);
+
+            self.mcp_servers_cache.get(&id)
+                .ok_or_else(|| anyhow::anyhow!("MCP server not found"))?
+                .clone()
+        } else {
+            // 新增 MCP 服务器 - 使用时间戳生成简单 ID
+            log::info!("Adding new MCP server: {}", data.name);
+
+            let id = format!("mcp_{}", std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis());
+
+            McpServer {
+                id,
+                name: data.name.clone(),
+                server: data.server.clone(),
+                apps: McpApps::default(),
+                description: data.description.clone(),
+                homepage: data.homepage.clone(),
+                docs: data.docs.clone(),
+                tags: Vec::new(),
+            }
+        };
+
+        // 更新字段
+        server.name = data.name;
+        server.server = data.server;
+        server.description = data.description;
+        server.homepage = data.homepage;
+        server.docs = data.docs;
+        server.apps.claude = data.claude_enabled;
+        server.apps.codex = data.codex_enabled;
+        server.apps.gemini = data.gemini_enabled;
+        server.apps.opencode = data.opencode_enabled;
+
+        self.db.save_mcp_server(&server)?;
+        self.refresh_mcp_servers()?;
+        self.close_mcp_form();
+        Ok(())
+    }
+
     /// 切换 MCP 服务器的应用启用状态
     pub async fn toggle_mcp_app(&mut self, server_id: &str, app: &str, enabled: bool) -> Result<()> {
         log::info!("Toggling MCP {} for {}: {}", server_id, app, enabled);

@@ -13,6 +13,7 @@ impl App {
             AppMode::Universal => self.handle_universal_key(key),
             AppMode::Config => self.handle_config_key(key),
             AppMode::ProviderForm => self.handle_provider_form_key(key, modifiers),
+            AppMode::McpForm => self.handle_mcp_form_key(key, modifiers),
         }
     }
 
@@ -162,6 +163,19 @@ impl App {
                     Ok(None)
                 }
             }
+            KeyCode::Char('a') | KeyCode::Char('A') => {
+                self.show_add_mcp_form();
+                Ok(None)
+            }
+            KeyCode::Char('e') | KeyCode::Char('E') => {
+                if let Some(server) = self.get_selected_mcp_server() {
+                    let id = server.id.clone();
+                    self.show_edit_mcp_form(&id);
+                    Ok(None)
+                } else {
+                    Ok(None)
+                }
+            }
             KeyCode::Char('r') | KeyCode::Char('R') => {
                 self.refresh_mcp_servers()?;
                 Ok(None)
@@ -228,6 +242,25 @@ impl App {
             Ok(None)
         }
     }
+
+    fn handle_mcp_form_key(&mut self, key: KeyCode, modifiers: crossterm::event::KeyModifiers) -> Result<Option<AppAction>> {
+        if let Some(form) = &mut self.mcp_form {
+            use crate::ui::mcp_form::FormAction;
+
+            match form.handle_key(key, modifiers) {
+                FormAction::Submit(data) => {
+                    Ok(Some(AppAction::SaveMcpServer(data)))
+                }
+                FormAction::Cancel => {
+                    self.close_mcp_form();
+                    Ok(None)
+                }
+                FormAction::None => Ok(None),
+            }
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 /// 应用操作枚举（需要异步执行的操作）
@@ -236,6 +269,7 @@ pub enum AppAction {
     SwitchProvider(String),
     DeleteProvider(String),
     SaveProvider(crate::ui::provider_form::ProviderFormData),
+    SaveMcpServer(crate::ui::mcp_form::McpFormData),
     StartProxy,
     StopProxy,
     RestartProxy,

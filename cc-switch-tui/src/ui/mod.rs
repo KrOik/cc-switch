@@ -9,3 +9,4 @@ pub mod common;
 pub mod dialog;
 pub mod forms;
 pub mod provider_form;
+pub mod mcp_form;
