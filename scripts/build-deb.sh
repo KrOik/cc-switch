@@ -26,8 +26,10 @@ chmod +x debian-pkg/usr/bin/cc-switch-tui
 
 # Copy control files
 echo "Copying control files..."
-# Extract only the binary package section from debian/control (starting from "Package:")
-sed -n '/^Package:/,$p' debian/control > debian-pkg/DEBIAN/control
+# Extract only the binary package section and replace template variables
+sed -n '/^Package:/,$p' debian/control | \
+  sed 's/${shlibs:Depends}/libc6, libgcc-s1, libssl3/' | \
+  sed 's/, ${misc:Depends}//' > debian-pkg/DEBIAN/control
 cp debian/postinst debian-pkg/DEBIAN/
 cp debian/prerm debian-pkg/DEBIAN/
 chmod +x debian-pkg/DEBIAN/postinst
