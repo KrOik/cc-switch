@@ -3,19 +3,15 @@ set -e
 
 echo "Building CC-Switch TUI for ARM64 (Debian 10/11)..."
 
-# Check if cross-compilation toolchain is installed
-if ! command -v aarch64-linux-gnu-gcc &> /dev/null; then
-    echo "Error: ARM64 cross-compilation toolchain not found"
-    echo "Please install: sudo apt-get install gcc-aarch64-linux-gnu"
-    exit 1
+# Check if cross is installed
+if ! command -v cross &> /dev/null; then
+    echo "Installing cross..."
+    cargo install cross --git https://github.com/cross-rs/cross
 fi
 
-# Add ARM64 target if not already added
-rustup target add aarch64-unknown-linux-gnu || true
-
-# Build for ARM64
+# Build for ARM64 using cross
 echo "Building release binary for ARM64..."
-cargo build --release --target aarch64-unknown-linux-gnu
+cross build --release --target aarch64-unknown-linux-gnu
 
 # Create debian package structure
 echo "Creating debian package structure..."
