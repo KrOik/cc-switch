@@ -14,6 +14,7 @@ impl App {
             AppMode::Config => self.handle_config_key(key),
             AppMode::ProviderForm => self.handle_provider_form_key(key, modifiers),
             AppMode::McpForm => self.handle_mcp_form_key(key, modifiers),
+            AppMode::UniversalForm => self.handle_universal_form_key(key, modifiers),
         }
     }
 
@@ -206,6 +207,29 @@ impl App {
                     Ok(None)
                 }
             }
+            KeyCode::Char('a') | KeyCode::Char('A') => {
+                self.show_add_universal_form();
+                Ok(None)
+            }
+            KeyCode::Char('e') | KeyCode::Char('E') => {
+                if let Some(provider) = self.get_selected_universal_provider() {
+                    let id = provider.id.clone();
+                    self.show_edit_universal_form(&id);
+                    Ok(None)
+                } else {
+                    Ok(None)
+                }
+            }
+            KeyCode::Char('d') | KeyCode::Char('D') => {
+                if let Some(provider) = self.get_selected_universal_provider() {
+                    let id = provider.id.clone();
+                    let name = provider.name.clone();
+                    self.show_delete_universal_confirm(id, &name);
+                    Ok(None)
+                } else {
+                    Ok(None)
+                }
+            }
             KeyCode::Char('r') | KeyCode::Char('R') => {
                 self.refresh_universal_providers()?;
                 Ok(None)
@@ -261,6 +285,25 @@ impl App {
             Ok(None)
         }
     }
+
+    fn handle_universal_form_key(&mut self, key: KeyCode, modifiers: crossterm::event::KeyModifiers) -> Result<Option<AppAction>> {
+        if let Some(form) = &mut self.universal_form {
+            use crate::ui::universal_form::FormAction;
+
+            match form.handle_key(key, modifiers) {
+                FormAction::Submit(data) => {
+                    Ok(Some(AppAction::SaveUniversalProvider(data)))
+                }
+                FormAction::Cancel => {
+                    self.close_universal_form();
+                    Ok(None)
+                }
+                FormAction::None => Ok(None),
+            }
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 /// 应用操作枚举（需要异步执行的操作）
@@ -270,11 +313,13 @@ pub enum AppAction {
     DeleteProvider(String),
     SaveProvider(crate::ui::provider_form::ProviderFormData),
     SaveMcpServer(crate::ui::mcp_form::McpFormData),
+    SaveUniversalProvider(crate::ui::universal_form::UniversalFormData),
     StartProxy,
     StopProxy,
     RestartProxy,
     ToggleProxyTakeover(String, bool),
     DeleteMcpServer(String),
+    DeleteUniversalProvider(String),
     SyncUniversalProvider(String),
     RefreshProxyStatus,
 }

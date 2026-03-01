@@ -79,6 +79,11 @@ fn render_ui(f: &mut Frame, app: &App) {
                 form.render(f, f.area());
             }
         }
+        AppMode::UniversalForm => {
+            if let Some(form) = &app.universal_form {
+                form.render(f, f.area());
+            }
+        }
     }
 
     // 如果有对话框，渲染在最上层
@@ -99,6 +104,9 @@ fn execute_action(rt: &Runtime, app: &mut App, action: AppAction) -> Result<()> 
         AppAction::SaveMcpServer(data) => {
             rt.block_on(app.save_mcp_server(data))?;
         }
+        AppAction::SaveUniversalProvider(data) => {
+            rt.block_on(app.save_universal_provider(data))?;
+        }
         AppAction::StartProxy => {
             rt.block_on(app.start_proxy())?;
         }
@@ -113,6 +121,9 @@ fn execute_action(rt: &Runtime, app: &mut App, action: AppAction) -> Result<()> 
         }
         AppAction::DeleteMcpServer(id) => {
             rt.block_on(app.delete_mcp_server(&id))?;
+        }
+        AppAction::DeleteUniversalProvider(id) => {
+            rt.block_on(app.delete_universal_provider(&id))?;
         }
         AppAction::SyncUniversalProvider(id) => {
             rt.block_on(app.sync_universal_provider(&id))?;
@@ -130,6 +141,9 @@ fn execute_pending_action(rt: &Runtime, app: &mut App, action: super::PendingAct
         }
         super::PendingAction::DeleteMcpServer(id) => {
             rt.block_on(app.delete_mcp_server(&id))?;
+        }
+        super::PendingAction::DeleteUniversalProvider(id) => {
+            rt.block_on(app.delete_universal_provider(&id))?;
         }
         super::PendingAction::StopProxy => {
             rt.block_on(app.stop_proxy())?;

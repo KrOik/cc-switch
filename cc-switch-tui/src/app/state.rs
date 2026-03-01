@@ -14,6 +14,7 @@ pub enum AppMode {
     Config,
     ProviderForm,
     McpForm,
+    UniversalForm,
 }
 
 pub struct App {
@@ -46,6 +47,7 @@ pub struct App {
     pub(crate) pending_action: Option<PendingAction>,
     pub(crate) provider_form: Option<crate::ui::provider_form::ProviderFormView>,
     pub(crate) mcp_form: Option<crate::ui::mcp_form::McpFormView>,
+    pub(crate) universal_form: Option<crate::ui::universal_form::UniversalFormView>,
 }
 
 // 临时结构体，用于存储数据（避免依赖完整的类型定义）
@@ -140,6 +142,7 @@ impl App {
             pending_action: None,
             provider_form: None,
             mcp_form: None,
+            universal_form: None,
         })
     }
 

@@ -4,13 +4,14 @@ use anyhow::Result;
 impl App {
     /// 切换 Provider
     pub async fn switch_provider(&mut self, provider_id: &str) -> Result<()> {
-        // TODO: 实现实际的切换逻辑
-        // 1. 更新数据库中的当前 provider
-        // 2. 写入 live 配置
-        // 3. 刷新缓存
-
         log::info!("Switching to provider: {}", provider_id);
+
+        // 更新数据库中的当前 provider
+        self.db.set_current_provider(&self.current_app_type, provider_id)?;
+
+        // 刷新缓存
         self.refresh_providers()?;
+
         Ok(())
     }
 
@@ -57,7 +58,11 @@ impl App {
     pub async fn toggle_proxy_takeover(&mut self, app_type: &str, enabled: bool) -> Result<()> {
         log::info!("Toggling proxy takeover for {}: {}", app_type, enabled);
 
-        // TODO: 实现实际的接管切换逻辑
+        // 调用 ProxyService 的接管切换方法
+        self.proxy_service.set_takeover_for_app(app_type, enabled).await
+            .map_err(|e| anyhow::anyhow!("切换接管失败: {}", e))?;
+
+        // 更新本地状态
         match app_type {
             "claude" => self.proxy_takeover.claude = enabled,
             "codex" => self.proxy_takeover.codex = enabled,
@@ -233,8 +238,21 @@ impl App {
     pub async fn toggle_mcp_app(&mut self, server_id: &str, app: &str, enabled: bool) -> Result<()> {
         log::info!("Toggling MCP {} for {}: {}", server_id, app, enabled);
 
-        // TODO: 实现实际的切换逻辑
-        self.refresh_mcp_servers()?;
+        // 获取服务器并更新应用启用状态
+        if let Some(mut server) = self.mcp_servers_cache.get(server_id).cloned() {
+            match app {
+                "claude" => server.apps.claude = enabled,
+                "codex" => server.apps.codex = enabled,
+                "gemini" => server.apps.gemini = enabled,
+                "opencode" => server.apps.opencode = enabled,
+                _ => return Err(anyhow::anyhow!("Unknown app type: {}", app)),
+            }
+
+            // 保存到数据库
+            self.db.save_mcp_server(&server)?;
+            self.refresh_mcp_servers()?;
+        }
+
         Ok(())
     }
 
@@ -243,6 +261,101 @@ impl App {
         log::info!("Syncing universal provider: {}", provider_id);
 
         // TODO: 实现实际的同步逻辑
+        self.refresh_universal_providers()?;
+        Ok(())
+    }
+
+    /// 显示添加统一供应商表单
+    pub fn show_add_universal_form(&mut self) {
+        self.universal_form = Some(crate::ui::universal_form::UniversalFormView::new_add());
+        self.mode = super::AppMode::UniversalForm;
+    }
+
+    /// 显示编辑统一供应商表单
+    pub fn show_edit_universal_form(&mut self, provider_id: &str) {
+        // 从数据库获取完整的 UniversalProvider 数据
+        if let Ok(Some(provider)) = self.db.get_universal_provider(provider_id) {
+            self.universal_form = Some(crate::ui::universal_form::UniversalFormView::new_edit(
+                provider.id.clone(),
+                provider.name.clone(),
+                provider.provider_type.clone(),
+                provider.base_url.clone(),
+                provider.api_key.clone(),
+                provider.website_url.clone(),
+                provider.notes.clone(),
+                provider.apps.claude,
+                provider.apps.codex,
+                provider.apps.gemini,
+            ));
+            self.mode = super::AppMode::UniversalForm;
+        }
+    }
+
+    /// 关闭统一供应商表单
+    pub fn close_universal_form(&mut self) {
+        self.universal_form = None;
+        self.mode = super::AppMode::Universal;
+    }
+
+    /// 保存统一供应商（新增或编辑）
+    pub async fn save_universal_provider(&mut self, data: crate::ui::universal_form::UniversalFormData) -> Result<()> {
+        use cc_switch_core::provider::{UniversalProvider, UniversalProviderApps};
+
+        let provider = if let Some(id) = data.id {
+            // 编辑现有统一供应商
+            log::info!("Updating universal provider: {}", id);
+
+            let mut provider = self.db.get_universal_provider(&id)?
+                .ok_or_else(|| anyhow::anyhow!("Universal provider not found"))?;
+
+            provider.name = data.name;
+            provider.provider_type = data.provider_type;
+            provider.base_url = data.base_url;
+            provider.api_key = data.api_key;
+            provider.website_url = data.website_url;
+            provider.notes = data.notes;
+            provider.apps.claude = data.claude_enabled;
+            provider.apps.codex = data.codex_enabled;
+            provider.apps.gemini = data.gemini_enabled;
+            provider
+        } else {
+            // 新增统一供应商
+            log::info!("Adding new universal provider: {}", data.name);
+
+            let id = format!("universal_{}", std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis());
+
+            let mut provider = UniversalProvider::new(
+                id,
+                data.name,
+                data.provider_type,
+                data.base_url,
+                data.api_key,
+            );
+
+            provider.website_url = data.website_url;
+            provider.notes = data.notes;
+            provider.apps = UniversalProviderApps {
+                claude: data.claude_enabled,
+                codex: data.codex_enabled,
+                gemini: data.gemini_enabled,
+            };
+            provider
+        };
+
+        self.db.save_universal_provider(&provider)?;
+        self.refresh_universal_providers()?;
+        self.close_universal_form();
+        Ok(())
+    }
+
+    /// 删除统一供应商
+    pub async fn delete_universal_provider(&mut self, provider_id: &str) -> Result<()> {
+        log::info!("Deleting universal provider: {}", provider_id);
+
+        self.db.delete_universal_provider(provider_id)?;
         self.refresh_universal_providers()?;
         Ok(())
     }

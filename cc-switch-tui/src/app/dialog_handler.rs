@@ -94,6 +94,19 @@ impl App {
         self.pending_action = Some(PendingAction::RestartProxy);
     }
 
+    /// 显示删除统一供应商的确认对话框
+    pub fn show_delete_universal_confirm(&mut self, id: String, name: &str) {
+        self.confirm_dialog = Some(
+            ConfirmDialog::new(
+                "删除统一供应商",
+                &format!("确定要删除统一供应商 \"{}\" 吗？\n\n此操作无法撤销。", name)
+            )
+            .with_confirm_text("删除")
+            .with_cancel_text("取消")
+        );
+        self.pending_action = Some(PendingAction::DeleteUniversalProvider(id));
+    }
+
     /// 检查是否有待处理的操作需要执行
     pub fn take_pending_action(&mut self) -> Option<PendingAction> {
         self.pending_action.take()
