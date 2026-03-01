@@ -23,7 +23,19 @@ pub fn run_tui() -> Result<()> {
 
         if event::poll(std::time::Duration::from_millis(100))? {
             if let Event::Key(KeyEvent { code, .. }) = event::read()? {
-                app.handle_key(code)?;
+                // 如果有对话框，优先处理对话框输入
+                if app.has_dialog() {
+                    if let Ok(handled) = app.handle_dialog_key(code) {
+                        if !handled {
+                            // 用户确认了操作，需要执行待处理的操作
+                            // 这里暂时只是关闭对话框，实际操作需要异步处理
+                            // TODO: 集成异步操作执行
+                        }
+                    }
+                } else {
+                    // 正常的键盘处理
+                    app.handle_key(code)?;
+                }
             }
         }
 
@@ -39,6 +51,7 @@ pub fn run_tui() -> Result<()> {
 }
 
 fn render_ui(f: &mut Frame, app: &App) {
+    // 渲染主界面
     match app.mode {
         AppMode::Dashboard => ui::dashboard::render(f, app),
         AppMode::Providers => ui::providers::render(f, app),
@@ -46,5 +59,10 @@ fn render_ui(f: &mut Frame, app: &App) {
         AppMode::Mcp => ui::mcp::render(f, app),
         AppMode::Universal => ui::universal::render(f, app),
         AppMode::Config => ui::config::render(f, app),
+    }
+
+    // 如果有对话框，渲染在最上层
+    if let Some(dialog) = app.get_dialog() {
+        ui::dialog::render_confirm_dialog(f, dialog);
     }
 }

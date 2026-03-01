@@ -6,3 +6,4 @@ pub mod mcp;
 pub mod universal;
 pub mod config;
 pub mod common;
+pub mod dialog;

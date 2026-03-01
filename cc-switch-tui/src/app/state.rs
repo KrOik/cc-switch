@@ -3,6 +3,7 @@ use cc_switch_core::{Database, ProxyService};
 use indexmap::IndexMap;
 use std::sync::Arc;
 use std::collections::HashMap;
+use crate::ui::dialog::ConfirmDialog;
 
 pub enum AppMode {
     Dashboard,
@@ -37,6 +38,10 @@ pub struct App {
     pub(crate) proxy_status: Option<ProxyStatusStub>,
     pub(crate) proxy_config: ProxyConfigStub,
     pub(crate) proxy_takeover: ProxyTakeoverStub,
+
+    // UI 状态
+    pub(crate) confirm_dialog: Option<ConfirmDialog>,
+    pub(crate) pending_action: Option<PendingAction>,
 }
 
 // 临时结构体，用于存储数据（避免依赖完整的类型定义）
@@ -96,6 +101,16 @@ impl Default for ProxyTakeoverStub {
     }
 }
 
+/// 待执行的操作（等待用户确认）
+#[derive(Clone, Debug)]
+pub enum PendingAction {
+    DeleteProvider(String),
+    DeleteMcpServer(String),
+    DeleteUniversalProvider(String),
+    StopProxy,
+    RestartProxy,
+}
+
 impl App {
     pub fn new() -> Result<Self> {
         let db = Arc::new(Database::init()?);
@@ -117,6 +132,8 @@ impl App {
             proxy_status: None,
             proxy_config: ProxyConfigStub::default(),
             proxy_takeover: ProxyTakeoverStub::default(),
+            confirm_dialog: None,
+            pending_action: None,
         })
     }
 

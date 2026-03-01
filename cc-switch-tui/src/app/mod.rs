@@ -3,6 +3,7 @@ pub mod getters;
 pub mod runner;
 pub mod input;
 pub mod actions;
+pub mod dialog_handler;
 
 pub use state::*;
 pub use runner::run_tui;

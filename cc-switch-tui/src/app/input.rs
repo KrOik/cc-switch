@@ -73,7 +73,9 @@ impl App {
             KeyCode::Char('d') | KeyCode::Char('D') => {
                 if let Some(provider) = self.get_selected_provider() {
                     let id = provider.id.clone();
-                    Ok(Some(AppAction::DeleteProvider(id)))
+                    let name = provider.name.clone();
+                    self.show_delete_provider_confirm(id, &name);
+                    Ok(None)
                 } else {
                     Ok(None)
                 }
@@ -135,7 +137,13 @@ impl App {
             KeyCode::Char('d') | KeyCode::Char('D') => {
                 if let Some(server) = self.get_selected_mcp_server() {
                     let id = server.id.clone();
-                    Ok(Some(AppAction::DeleteMcpServer(id)))
+                    let name = if server.name.is_empty() {
+                        server.id.clone()
+                    } else {
+                        server.name.clone()
+                    };
+                    self.show_delete_mcp_confirm(id, &name);
+                    Ok(None)
                 } else {
                     Ok(None)
                 }
