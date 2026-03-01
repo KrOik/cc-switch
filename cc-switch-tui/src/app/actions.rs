@@ -25,6 +25,9 @@ impl App {
 
         log::info!("Provider switched to {} and live config updated", provider_id);
 
+        // 同步所有启用的 MCP 服务器到当前应用
+        self.sync_mcp_for_current_app(&app_type)?;
+
         // 刷新缓存
         self.refresh_providers()?;
 
@@ -177,6 +180,9 @@ impl App {
                 .map_err(|e| anyhow::anyhow!("写入 live 配置失败: {}", e))?;
 
             log::info!("Live config updated for provider {}", provider.id);
+
+            // 同步 MCP 配置
+            self.sync_mcp_for_current_app(&app_type)?;
         }
 
         self.refresh_providers()?;
@@ -187,6 +193,12 @@ impl App {
     /// 删除 Provider
     pub async fn delete_provider(&mut self, provider_id: &str) -> Result<()> {
         log::info!("Deleting provider: {}", provider_id);
+
+        // 检查是否为当前 provider
+        let current_provider_id = self.db.get_current_provider(&self.current_app_type)?;
+        if current_provider_id.as_deref() == Some(provider_id) {
+            return Err(anyhow::anyhow!("无法删除当前正在使用的 Provider，请先切换到其他 Provider"));
+        }
 
         self.db.delete_provider(provider_id, &self.current_app_type)?;
         self.refresh_providers()?;
@@ -422,6 +434,42 @@ impl App {
                 self.proxy_status = None;
             }
         }
+        Ok(())
+    }
+
+    /// 同步所有启用的 MCP 服务器到指定应用
+    fn sync_mcp_for_current_app(&self, app_type: &cc_switch_core::app_config::AppType) -> Result<()> {
+        use cc_switch_core::mcp;
+
+        log::info!("Syncing MCP servers for app: {:?}", app_type);
+
+        // 获取所有 MCP 服务器
+        let servers = self.db.get_all_mcp_servers()?;
+
+        // 同步所有为当前应用启用的 MCP 服务器
+        for server in servers.values() {
+            if server.apps.is_enabled_for(app_type) {
+                match app_type {
+                    cc_switch_core::app_config::AppType::Claude => {
+                        mcp::sync_single_server_to_claude(&Default::default(), &server.id, &server.server)?;
+                    }
+                    cc_switch_core::app_config::AppType::Codex => {
+                        mcp::sync_single_server_to_codex(&Default::default(), &server.id, &server.server)?;
+                    }
+                    cc_switch_core::app_config::AppType::Gemini => {
+                        mcp::sync_single_server_to_gemini(&Default::default(), &server.id, &server.server)?;
+                    }
+                    cc_switch_core::app_config::AppType::OpenCode => {
+                        mcp::sync_single_server_to_opencode(&Default::default(), &server.id, &server.server)?;
+                    }
+                    cc_switch_core::app_config::AppType::OpenClaw => {
+                        log::debug!("OpenClaw MCP support is still in development, skipping sync");
+                    }
+                }
+            }
+        }
+
+        log::info!("MCP sync completed for app: {:?}", app_type);
         Ok(())
     }
 }
