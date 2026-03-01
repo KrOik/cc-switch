@@ -32,7 +32,7 @@ Package: cc-switch-tui
 Version: 3.11.1
 Architecture: arm64
 Maintainer: Jason Young <jason@example.com>
-Depends: libc6, libgcc-s1, libssl3
+Depends: libc6, libgcc-s1
 Section: net
 Priority: optional
 Homepage: https://github.com/farion1231/cc-switch
