@@ -158,6 +158,16 @@ impl App {
         provider.website_url = data.website_url;
         provider.notes = data.notes;
 
+        // 验证并规范化配置
+        let app_type = cc_switch_core::app_config::AppType::from_str(&self.current_app_type)
+            .map_err(|e| anyhow::anyhow!("无效的应用类型: {}", e))?;
+
+        cc_switch_core::services::provider::ProviderService::validate_and_normalize_provider(
+            &app_type,
+            &mut provider,
+        )
+        .map_err(|e| anyhow::anyhow!("配置验证失败: {}", e))?;
+
         // 保存到数据库
         self.db.save_provider(&self.current_app_type, &provider)?;
 
@@ -242,6 +252,16 @@ impl App {
 
             provider.meta = Some(meta);
         }
+
+        // 验证并规范化配置
+        let app_type = cc_switch_core::app_config::AppType::from_str(&self.current_app_type)
+            .map_err(|e| anyhow::anyhow!("无效的应用类型: {}", e))?;
+
+        cc_switch_core::services::provider::ProviderService::validate_and_normalize_provider(
+            &app_type,
+            &mut provider,
+        )
+        .map_err(|e| anyhow::anyhow!("配置验证失败: {}", e))?;
 
         // 保存到数据库
         self.db.save_provider(&self.current_app_type, &provider)?;

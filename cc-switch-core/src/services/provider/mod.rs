@@ -137,6 +137,19 @@ impl ProviderService {
         }
     }
 
+    /// Validate and normalize provider configuration
+    ///
+    /// This is a public wrapper for validation and normalization logic.
+    /// Use this before saving a provider to ensure configuration is valid.
+    pub fn validate_and_normalize_provider(
+        app_type: &AppType,
+        provider: &mut Provider,
+    ) -> Result<(), AppError> {
+        Self::normalize_provider_if_claude(app_type, provider);
+        Self::validate_provider_settings(app_type, provider)?;
+        Ok(())
+    }
+
     /// List all providers for an app type
     pub fn list(
         state: &AppState,
