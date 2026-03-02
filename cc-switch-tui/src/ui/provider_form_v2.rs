@@ -398,14 +398,22 @@ impl ProviderFormViewV2 {
             None
         };
 
-        // 构建完整的 provider 数据
-        let preview_data = serde_json::json!({
-            "name": name,
-            "settings_config": settings_config,
-            "meta": meta,
-            "website_url": if website_url.is_empty() { None } else { Some(website_url) },
-            "notes": if notes.is_empty() { None } else { Some(notes) },
-        });
+        // 对于 Claude/Codex/Gemini 等应用，只显示 settings_config 的内容
+        // 因为这才是会被写入 live 配置文件的内容
+        let preview_data = match provider_type {
+            ProviderType::Claude | ProviderType::Generic => {
+                // Claude 和通用类型：只显示 settings_config
+                settings_config
+            }
+            ProviderType::Codex => {
+                // Codex：显示 auth 和 config 结构
+                settings_config
+            }
+            ProviderType::OpenCode => {
+                // OpenCode：显示 provider 配置片段
+                settings_config
+            }
+        };
 
         // 格式化 JSON
         match serde_json::to_string_pretty(&preview_data) {

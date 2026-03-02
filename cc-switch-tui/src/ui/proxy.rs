@@ -36,7 +36,9 @@ pub fn render(f: &mut Frame, app: &App) {
     let shortcuts = vec![
         ("S", "启动/停止"),
         ("R", "重启"),
-        ("T", "切换接管"),
+        ("1", "切换Claude接管"),
+        ("2", "切换Codex接管"),
+        ("3", "切换Gemini接管"),
         ("Esc", "返回"),
     ];
     render_help(f, chunks[4], &shortcuts);
@@ -122,21 +124,42 @@ fn render_proxy_stats(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
 
     let lines = vec![
         Line::from(vec![
-            Span::styled("Claude 接管: ", Style::default().fg(Color::Gray)),
-            Span::raw(if takeover.claude { "✓ 启用" } else { "✗ 禁用" }),
+            Span::styled("[1] Claude 接管: ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                if takeover.claude { "✓ 启用" } else { "✗ 禁用" },
+                if takeover.claude {
+                    Style::default().fg(Color::Green)
+                } else {
+                    Style::default().fg(Color::DarkGray)
+                },
+            ),
         ]),
         Line::from(vec![
-            Span::styled("Codex 接管:  ", Style::default().fg(Color::Gray)),
-            Span::raw(if takeover.codex { "✓ 启用" } else { "✗ 禁用" }),
+            Span::styled("[2] Codex 接管:  ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                if takeover.codex { "✓ 启用" } else { "✗ 禁用" },
+                if takeover.codex {
+                    Style::default().fg(Color::Green)
+                } else {
+                    Style::default().fg(Color::DarkGray)
+                },
+            ),
         ]),
         Line::from(vec![
-            Span::styled("Gemini 接管: ", Style::default().fg(Color::Gray)),
-            Span::raw(if takeover.gemini { "✓ 启用" } else { "✗ 禁用" }),
+            Span::styled("[3] Gemini 接管: ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                if takeover.gemini { "✓ 启用" } else { "✗ 禁用" },
+                if takeover.gemini {
+                    Style::default().fg(Color::Green)
+                } else {
+                    Style::default().fg(Color::DarkGray)
+                },
+            ),
         ]),
     ];
 
     let widget = Paragraph::new(lines)
-        .block(Block::default().borders(Borders::ALL).title("接管状态"));
+        .block(Block::default().borders(Borders::ALL).title("接管状态 (按数字键切换)"));
     f.render_widget(widget, area);
 }
 

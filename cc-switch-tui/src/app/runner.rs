@@ -134,7 +134,13 @@ fn execute_action(rt: &Runtime, app: &mut App, action: AppAction) -> Result<()> 
         AppAction::SyncUniversalProvider(id) => {
             rt.block_on(app.sync_universal_provider(&id))?;
         }
-        _ => {}
+        AppAction::RestartProxy => {
+            rt.block_on(app.stop_proxy())?;
+            rt.block_on(app.start_proxy())?;
+        }
+        AppAction::ToggleProxyTakeover(app_type, enabled) => {
+            rt.block_on(app.toggle_proxy_takeover(&app_type, enabled))?;
+        }
     }
     Ok(())
 }
