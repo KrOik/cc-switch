@@ -88,10 +88,15 @@ impl ProxyServer {
         // 构建路由
         let app = self.build_router();
 
-        // 绑定监听器
-        let listener = tokio::net::TcpListener::bind(&addr)
-            .await
-            .map_err(|e| ProxyError::BindFailed(e.to_string()))?;
+        // 绑定监听器（启用 SO_REUSEADDR 以处理 TIME_WAIT 状态）
+        let socket = tokio::net::TcpSocket::new_v4()
+            .map_err(|e| ProxyError::BindFailed(format!("创建套接字失败: {e}")))?;
+        socket.set_reuseaddr(true)
+            .map_err(|e| ProxyError::BindFailed(format!("设置 SO_REUSEADDR 失败: {e}")))?;
+        socket.bind(addr)
+            .map_err(|e| ProxyError::BindFailed(format!("绑定地址失败: {e}")))?;
+        let listener = socket.listen(1024)
+            .map_err(|e| ProxyError::BindFailed(format!("监听失败: {e}")))?;
 
         log::info!("[{}] 代理服务器启动于 {addr}", log_srv::STARTED);
 

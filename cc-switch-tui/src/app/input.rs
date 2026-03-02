@@ -120,7 +120,7 @@ impl App {
             KeyCode::Char('r') | KeyCode::Char('R') => {
                 Ok(Some(AppAction::RestartProxy))
             }
-            KeyCode::Char('1') => {
+            KeyCode::Char('1') | KeyCode::Char(' ') if self.proxy_takeover.claude => {
                 let enabled = !self.proxy_takeover.claude;
                 Ok(Some(AppAction::ToggleProxyTakeover("claude".to_string(), enabled)))
             }
@@ -131,6 +131,16 @@ impl App {
             KeyCode::Char('3') => {
                 let enabled = !self.proxy_takeover.gemini;
                 Ok(Some(AppAction::ToggleProxyTakeover("gemini".to_string(), enabled)))
+            }
+            KeyCode::Enter => {
+                // Enter key toggles the first available provider (Claude)
+                let enabled = !self.proxy_takeover.claude;
+                Ok(Some(AppAction::ToggleProxyTakeover("claude".to_string(), enabled)))
+            }
+            KeyCode::Char(' ') => {
+                // Space key also toggles Claude
+                let enabled = !self.proxy_takeover.claude;
+                Ok(Some(AppAction::ToggleProxyTakeover("claude".to_string(), enabled)))
             }
             _ => Ok(None),
         }
