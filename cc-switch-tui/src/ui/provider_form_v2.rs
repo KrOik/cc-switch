@@ -378,7 +378,7 @@ impl ProviderFormViewV2 {
 
         // 构建配置
         let parsed_config = ParsedProviderConfig {
-            provider_type,
+            provider_type: provider_type.clone(),
             base_url: base_url.to_string(),
             api_key: api_key.to_string(),
             models,
