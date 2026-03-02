@@ -19,6 +19,33 @@ use super::gemini_auth::{
 };
 use super::normalize_claude_models_in_value;
 
+/// 合并两个 JSON 配置对象
+///
+/// 规则：
+/// - base 是基础配置（现有配置）
+/// - overlay 是覆盖配置（provider 提供的配置）
+/// - 对于对象类型，递归合并
+/// - 对于其他类型，overlay 覆盖 base
+fn merge_json_configs(base: &Value, overlay: &Value) -> Value {
+    match (base, overlay) {
+        (Value::Object(base_map), Value::Object(overlay_map)) => {
+            let mut result = base_map.clone();
+            for (key, overlay_value) in overlay_map {
+                if let Some(base_value) = base_map.get(key) {
+                    // 递归合并
+                    result.insert(key.clone(), merge_json_configs(base_value, overlay_value));
+                } else {
+                    // 新字段，直接插入
+                    result.insert(key.clone(), overlay_value.clone());
+                }
+            }
+            Value::Object(result)
+        }
+        // 非对象类型，overlay 覆盖 base
+        (_, overlay) => overlay.clone(),
+    }
+}
+
 pub(crate) fn sanitize_claude_settings_for_live(settings: &Value) -> Value {
     let mut v = settings.clone();
     if let Some(obj) = v.as_object_mut() {
@@ -109,7 +136,17 @@ pub fn write_live_snapshot(app_type: &AppType, provider: &Provider) -> Result<()
     match app_type {
         AppType::Claude => {
             let path = get_claude_settings_path();
-            let settings = sanitize_claude_settings_for_live(&provider.settings_config);
+
+            // 读取现有配置（如果存在）
+            let existing_config = if path.exists() {
+                read_json_file(&path).unwrap_or_else(|_| serde_json::json!({}))
+            } else {
+                serde_json::json!({})
+            };
+
+            // 合并配置：保留现有配置，只更新 provider 提供的字段
+            let merged_config = merge_json_configs(&existing_config, &provider.settings_config);
+            let settings = sanitize_claude_settings_for_live(&merged_config);
             write_json_file(&path, &settings)?;
         }
         AppType::Codex => {

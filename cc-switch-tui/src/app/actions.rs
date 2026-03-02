@@ -36,16 +36,16 @@ impl App {
 
     /// 启动代理服务
     pub async fn start_proxy(&mut self) -> Result<()> {
-        log::info!("Starting proxy service...");
+        log::info!("Starting proxy service with takeover...");
 
-        match self.proxy_service.start().await {
+        match self.proxy_service.start_with_takeover().await {
             Ok(info) => {
                 self.proxy_running = true;
                 let addr = info.address.clone();
                 let port = info.port;
                 self.proxy_config.listen_address = addr.clone();
                 self.proxy_config.listen_port = port;
-                log::info!("Proxy started at {}:{}", addr, port);
+                log::info!("Proxy started at {}:{} with live config takeover", addr, port);
                 Ok(())
             }
             Err(e) => {
@@ -59,11 +59,11 @@ impl App {
     pub async fn stop_proxy(&mut self) -> Result<()> {
         log::info!("Stopping proxy service...");
 
-        match self.proxy_service.stop().await {
+        match self.proxy_service.stop_with_restore().await {
             Ok(_) => {
                 self.proxy_running = false;
                 self.proxy_status = None;
-                log::info!("Proxy stopped");
+                log::info!("Proxy stopped and live configs restored");
                 Ok(())
             }
             Err(e) => {

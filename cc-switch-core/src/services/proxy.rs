@@ -88,14 +88,31 @@ impl ProxyService {
                 .map_err(|e| format!("更新代理总开关失败: {e}"))?;
         }
 
-        // 2. 获取配置
+        // 2. 验证至少有一个应用配置了 provider
+        let has_provider = ["claude", "codex", "gemini"]
+            .iter()
+            .any(|app_type| {
+                self.db
+                    .get_current_provider(app_type)
+                    .ok()
+                    .flatten()
+                    .is_some()
+            });
+
+        if !has_provider {
+            return Err(
+                "未配置任何 Provider。请先在 Providers 页面添加并选择一个 Provider。".to_string(),
+            );
+        }
+
+        // 3. 获取配置
         let config = self
             .db
             .get_proxy_config()
             .await
             .map_err(|e| format!("获取代理配置失败: {e}"))?;
 
-        // 3. 若已在运行：确保持久化状态（如需要）并返回当前信息
+        // 4. 若已在运行：确保持久化状态（如需要）并返回当前信息
         if let Some(server) = self.server.read().await.as_ref() {
             let status = server.get_status().await;
             return Ok(ProxyServerInfo {
@@ -106,14 +123,14 @@ impl ProxyService {
             });
         }
 
-        // 4. 创建并启动服务器
+        // 5. 创建并启动服务器
         let server = ProxyServer::new(config.clone(), self.db.clone());
         let info = server
             .start()
             .await
             .map_err(|e| format!("启动代理服务器失败: {e}"))?;
 
-        // 5. 保存服务器实例
+        // 6. 保存服务器实例
         *self.server.write().await = Some(server);
 
         log::info!("代理服务器已启动: {}:{}", info.address, info.port);
