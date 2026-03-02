@@ -24,6 +24,7 @@ pub struct ProviderFormViewV2 {
     mode: ProviderFormMode,
     provider_type: ProviderType,
     error_message: Option<String>,
+    show_preview: bool,
 }
 
 impl ProviderFormViewV2 {
@@ -101,6 +102,7 @@ impl ProviderFormViewV2 {
             mode: ProviderFormMode::Add,
             provider_type: ProviderType::Generic,
             error_message: None,
+            show_preview: false,
         }
     }
 
@@ -195,11 +197,18 @@ impl ProviderFormViewV2 {
             mode: ProviderFormMode::Edit(provider_id),
             provider_type: parsed.provider_type,
             error_message: None,
+            show_preview: false,
         }
     }
 
     /// 处理键盘输入
     pub fn handle_key(&mut self, key: KeyCode, modifiers: KeyModifiers) -> FormAction {
+        // Ctrl+P 切换预览
+        if key == KeyCode::Char('p') && modifiers.contains(KeyModifiers::CONTROL) {
+            self.show_preview = !self.show_preview;
+            return FormAction::None;
+        }
+
         match key {
             KeyCode::Esc => FormAction::Cancel,
             _ => {
@@ -327,49 +336,198 @@ impl ProviderFormViewV2 {
         }
     }
 
+    /// 生成预览 JSON
+    fn generate_preview_json(&self) -> String {
+        // 获取表单值
+        let values = self.form.get_values();
+        if values.len() < 8 {
+            return "表单数据不完整".to_string();
+        }
+
+        // 解析 Provider 类型
+        let type_index = values[0].as_select_index().unwrap_or(0);
+        let provider_type = match type_index {
+            1 => ProviderType::Claude,
+            2 => ProviderType::Codex,
+            3 => ProviderType::OpenCode,
+            _ => ProviderType::Generic,
+        };
+
+        let name = values[1].as_text().unwrap_or("");
+        let base_url = values[2].as_text().unwrap_or("");
+        let api_key = values[3].as_text().unwrap_or("");
+        let models_text = values[4].as_text().unwrap_or("");
+        let api_format_index = values[5].as_select_index().unwrap_or(0);
+        let website_url = values[6].as_text().unwrap_or("");
+        let notes = values[7].as_text().unwrap_or("");
+
+        // 解析模型列表
+        let models: Vec<String> = models_text
+            .lines()
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect();
+
+        // 解析 API 格式
+        let api_format = match api_format_index {
+            1 => Some("anthropic".to_string()),
+            2 => Some("openai_chat".to_string()),
+            _ => None,
+        };
+
+        // 构建配置
+        let parsed_config = ParsedProviderConfig {
+            provider_type,
+            base_url: base_url.to_string(),
+            api_key: api_key.to_string(),
+            models,
+            api_format: api_format.clone(),
+            extra_fields: std::collections::HashMap::new(),
+        };
+
+        // 转换为 settings_config
+        let settings_config = parsed_config.to_settings_config();
+
+        // 构建 meta（如果有 api_format）
+        let meta = if api_format.is_some() {
+            Some(serde_json::json!({
+                "apiFormat": api_format
+            }))
+        } else {
+            None
+        };
+
+        // 构建完整的 provider 数据
+        let preview_data = serde_json::json!({
+            "name": name,
+            "settings_config": settings_config,
+            "meta": meta,
+            "website_url": if website_url.is_empty() { None } else { Some(website_url) },
+            "notes": if notes.is_empty() { None } else { Some(notes) },
+        });
+
+        // 格式化 JSON
+        match serde_json::to_string_pretty(&preview_data) {
+            Ok(json) => json,
+            Err(e) => format!("JSON 序列化失败: {}", e),
+        }
+    }
+
     /// 渲染表单
     pub fn render(&self, f: &mut Frame, area: Rect) {
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(3),  // 标题
-                Constraint::Min(10),    // 表单内容
-                Constraint::Length(3),  // 错误信息/提示
-            ])
-            .split(area);
+        if self.show_preview {
+            // 分屏模式：左侧表单，右侧预览
+            let main_chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([
+                    Constraint::Percentage(50),  // 左侧表单
+                    Constraint::Percentage(50),  // 右侧预览
+                ])
+                .split(area);
 
-        // 渲染标题
-        let title = match &self.mode {
-            ProviderFormMode::Add => "添加 Provider",
-            ProviderFormMode::Edit(_) => "编辑 Provider",
-        };
-        let title_block = Block::default()
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Cyan))
-            .title(title);
-        f.render_widget(title_block, chunks[0]);
+            // 左侧：表单
+            let left_chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(3),  // 标题
+                    Constraint::Min(10),    // 表单内容
+                    Constraint::Length(3),  // 错误信息/提示
+                ])
+                .split(main_chunks[0]);
 
-        // 渲染表单
-        self.form.render(f, chunks[1]);
+            // 渲染标题
+            let title = match &self.mode {
+                ProviderFormMode::Add => "添加 Provider",
+                ProviderFormMode::Edit(_) => "编辑 Provider",
+            };
+            let title_block = Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan))
+                .title(title);
+            f.render_widget(title_block, left_chunks[0]);
 
-        // 渲染错误信息或提示
-        let bottom_text = if let Some(error) = &self.error_message {
-            vec![
-                Span::styled("错误: ", Style::default().fg(Color::Red)),
-                Span::styled(error, Style::default().fg(Color::Red)),
-            ]
+            // 渲染表单
+            self.form.render(f, left_chunks[1]);
+
+            // 渲染错误信息或提示
+            let bottom_text = if let Some(error) = &self.error_message {
+                vec![
+                    Span::styled("错误: ", Style::default().fg(Color::Red)),
+                    Span::styled(error, Style::default().fg(Color::Red)),
+                ]
+            } else {
+                vec![
+                    Span::styled("Ctrl+P", Style::default().fg(Color::Magenta)),
+                    Span::raw(" 关闭预览  "),
+                    Span::styled("Ctrl+Enter", Style::default().fg(Color::Green)),
+                    Span::raw(" 提交  "),
+                    Span::styled("Esc", Style::default().fg(Color::Yellow)),
+                    Span::raw(" 取消"),
+                ]
+            };
+
+            let bottom_paragraph = Paragraph::new(Line::from(bottom_text))
+                .block(Block::default().borders(Borders::ALL));
+            f.render_widget(bottom_paragraph, left_chunks[2]);
+
+            // 右侧：JSON 预览
+            let preview_json = self.generate_preview_json();
+            let preview_paragraph = Paragraph::new(preview_json)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(Color::Green))
+                        .title("JSON 预览"),
+                )
+                .style(Style::default().fg(Color::White));
+            f.render_widget(preview_paragraph, main_chunks[1]);
         } else {
-            vec![
-                Span::styled("Ctrl+Enter", Style::default().fg(Color::Green)),
-                Span::raw(" 提交  "),
-                Span::styled("Esc", Style::default().fg(Color::Yellow)),
-                Span::raw(" 取消"),
-            ]
-        };
+            // 原有的垂直布局
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(3),  // 标题
+                    Constraint::Min(10),    // 表单内容
+                    Constraint::Length(3),  // 错误信息/提示
+                ])
+                .split(area);
 
-        let bottom_paragraph = Paragraph::new(Line::from(bottom_text))
-            .block(Block::default().borders(Borders::ALL));
-        f.render_widget(bottom_paragraph, chunks[2]);
+            // 渲染标题
+            let title = match &self.mode {
+                ProviderFormMode::Add => "添加 Provider",
+                ProviderFormMode::Edit(_) => "编辑 Provider",
+            };
+            let title_block = Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan))
+                .title(title);
+            f.render_widget(title_block, chunks[0]);
+
+            // 渲染表单
+            self.form.render(f, chunks[1]);
+
+            // 渲染错误信息或提示
+            let bottom_text = if let Some(error) = &self.error_message {
+                vec![
+                    Span::styled("错误: ", Style::default().fg(Color::Red)),
+                    Span::styled(error, Style::default().fg(Color::Red)),
+                ]
+            } else {
+                vec![
+                    Span::styled("Ctrl+P", Style::default().fg(Color::Magenta)),
+                    Span::raw(" 预览  "),
+                    Span::styled("Ctrl+Enter", Style::default().fg(Color::Green)),
+                    Span::raw(" 提交  "),
+                    Span::styled("Esc", Style::default().fg(Color::Yellow)),
+                    Span::raw(" 取消"),
+                ]
+            };
+
+            let bottom_paragraph = Paragraph::new(Line::from(bottom_text))
+                .block(Block::default().borders(Borders::ALL));
+            f.render_widget(bottom_paragraph, chunks[2]);
+        }
     }
 }
 
