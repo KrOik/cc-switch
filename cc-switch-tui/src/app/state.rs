@@ -265,10 +265,11 @@ impl App {
     }
 
     pub(crate) fn refresh_proxy_status(&mut self) -> Result<()> {
-        // TODO: 实现代理状态的获取
-        // 目前使用默认值
-        self.proxy_running = false;
-        self.proxy_status = None;
-        Ok(())
+        // 使用 tokio runtime 调用异步版本
+        let rt = tokio::runtime::Runtime::new()
+            .map_err(|e| anyhow::anyhow!("创建 runtime 失败: {}", e))?;
+        rt.block_on(async {
+            self.refresh_proxy_status_async().await
+        })
     }
 }

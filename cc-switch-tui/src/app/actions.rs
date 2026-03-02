@@ -622,13 +622,17 @@ impl App {
     pub async fn refresh_proxy_status_async(&mut self) -> Result<()> {
         match self.proxy_service.get_status().await {
             Ok(status) => {
-                self.proxy_running = true;
-                self.proxy_status = Some(super::ProxyStatusStub {
-                    uptime_seconds: status.uptime_seconds,
-                    active_connections: status.active_connections as u32,
-                    total_requests: status.total_requests,
-                    success_rate: status.success_rate as f64,
-                });
+                self.proxy_running = status.running;
+                if status.running {
+                    self.proxy_status = Some(super::ProxyStatusStub {
+                        uptime_seconds: status.uptime_seconds,
+                        active_connections: status.active_connections as u32,
+                        total_requests: status.total_requests,
+                        success_rate: status.success_rate as f64,
+                    });
+                } else {
+                    self.proxy_status = None;
+                }
             }
             Err(_) => {
                 self.proxy_running = false;
